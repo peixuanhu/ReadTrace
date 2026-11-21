@@ -1437,7 +1437,7 @@ class MainActivity : ComponentActivity() {
         val authorRow = bindToggle("显示作者行（在进度行上方）", showAuthorCheck)
         addHint("说明：如果文石元数据里没有作者，会显示未知；关闭后可节省空间。")
         val bookDurationRow = bindToggle("显示每本书籍阅读时长", showBookDurationCheck)
-        addHint("说明：打开后会在每本书的状态后追加“时长”；Neo 阅读器按本地阅读事件统计，微信读书按接口返回的阅读时长显示。")
+        addHint("开启后，阅读账单在每个书名右侧显示时长。微信读书采用所覆盖自然月的单书排行；按天或按周查看时，列名会标明月份。")
         val titleFontRow = bindSpinnerRow("标题字体（系统字体）", titleFontSpinner)
         val bodyFontRow = bindSpinnerRow("正文字体（系统字体）", bodyFontSpinner)
         pickFontDirBtn = Button(this).apply {

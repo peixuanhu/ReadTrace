@@ -1250,7 +1250,7 @@ object AutoWallpaperGenerator {
             key,
             bookMap.values
                 .sortedByDescending { it.readSeconds }
-                .map { toWeReadBookItem(context, key, it) to it.readSeconds * 1000L }
+                .map { toWeReadBookItem(context, key, it, s.timeUnit) to it.readSeconds * 1000L }
                 .filter { matchesReadingFilter(it.first, s) }
                 .take(s.topN),
             s,
@@ -1304,7 +1304,7 @@ object AutoWallpaperGenerator {
             .map { it.first to it.second }
         val weReadBooks = weReadBookScores.values
             .map { (book, scoreMs) ->
-                toWeReadBookItem(context, key, book).copy(durationText = formatDuration(scoreMs, s.timeUnit), menuPriceText = menuPriceText(scoreMs)) to scoreMs
+                toWeReadBookItem(context, key, book, s.timeUnit).copy(menuPriceText = menuPriceText(scoreMs)) to scoreMs
             }
             .filter { matchesReadingFilter(it.first, s) }
         val mergedBooks = enrichExcerptMenuBooks(context, key, mergeScoredBooksWithScores(localBooks + weReadBooks, s.topN, s.timeUnit), s, fetchWeReadExcerpt = true)
@@ -1518,7 +1518,7 @@ object AutoWallpaperGenerator {
         }.sortedByDescending { it.second }
     }
 
-    private fun toWeReadBookItem(context: Context, apiKey: String, book: WeReadClient.WallpaperBook): BookItem {
+    private fun toWeReadBookItem(context: Context, apiKey: String, book: WeReadClient.WallpaperBook, timeUnit: String): BookItem {
         val progress = if (book.bookId.isNotBlank()) {
             WeReadClient.fetchBookProgress(context, apiKey, book.bookId)
         } else {
@@ -1532,7 +1532,6 @@ object AutoWallpaperGenerator {
             book.readSeconds > 0L -> 1
             else -> 0
         }
-        val durationSeconds = progress?.recordReadingSeconds?.takeIf { it > 0L } ?: book.readSeconds
         return BookItem(
             bookId = book.bookId,
             title = book.title,
@@ -1540,7 +1539,7 @@ object AutoWallpaperGenerator {
             progress = null,
             status = status,
             progressText = progressText,
-            durationText = WeReadClient.formatSeconds(durationSeconds)
+            durationText = book.readSeconds.takeIf { it > 0 }?.let { formatDuration(it * 1000L, timeUnit) }
         )
     }
 
@@ -1571,7 +1570,13 @@ object AutoWallpaperGenerator {
                     progressBase.bookId.isNullOrBlank() && !book.bookId.isNullOrBlank() -> book
                     else -> progressBase
                 }
-                base.copy(durationText = formatDuration(total, unit), menuPriceText = menuPriceText(total)) to total
+                // A metadata-only row has a synthetic ranking score, not measured reading time.
+                val measuredDuration = when {
+                    old.first.durationText == null -> book.durationText
+                    book.durationText == null -> old.first.durationText
+                    else -> formatDuration(total, unit)
+                }
+                base.copy(durationText = measuredDuration, menuPriceText = menuPriceText(total)) to total
             }
         }
         return merged.values
@@ -2971,7 +2976,11 @@ object AutoWallpaperGenerator {
         val unitX = w - s(140f)
         val chefX = w - s(245f)
         val priceX = w - s(85f)
-        val titleColumnMaxWidth = if (noteTemplate) {
+        val durationColumn = !noteTemplate && s0.showBookDuration
+        val durationWidth = (rightEdge - leftMargin) * 0.32f
+        val titleColumnMaxWidth = if (durationColumn) {
+            (rightEdge - durationWidth - s(24f) - titleX).coerceAtLeast(s(160f))
+        } else if (noteTemplate) {
             (chefX - titleX - s(52f)).coerceAtLeast(s(160f))
         } else {
             (qtyX - titleX - s(28f)).coerceAtLeast(s(160f))
@@ -3004,6 +3013,14 @@ object AutoWallpaperGenerator {
         if (noteTemplate) {
             drawFittedText(c, "主厨", chefX, y, text, s(190f), Paint.Align.CENTER, 0.8f)
             if (excerptMenu) drawFittedText(c, "价格", priceX, y, text, s(90f), Paint.Align.CENTER, 0.8f)
+        } else if (durationColumn) {
+            val heading = when (s0.sourceMode) {
+                "WEREAD" -> if (isSameMonth(rangeStart, rangeEnd))
+                    SimpleDateFormat("M月时长", Locale.CHINA).format(Date(rangeStart)) else "月榜时长合计"
+                "MIXED" -> "本地＋微信月榜"
+                else -> "阅读时长"
+            }
+            drawFittedText(c, heading, rightEdge, y, text, durationWidth, Paint.Align.RIGHT)
         } else {
             drawFittedText(c, "数量", qtyX, y, text, s(84f), Paint.Align.CENTER, 0.8f)
             drawFittedText(c, "单位", unitX, y, text, s(84f), Paint.Align.CENTER, 0.8f)
@@ -3026,8 +3043,12 @@ object AutoWallpaperGenerator {
                     y = drawMultiLineText(c, "$prefix$excerpt", titleX, y, excerptPaint, excerptColumnMaxWidth, s(42f), maxExcerptLines)
                 }
             } else {
-                drawFittedText(c, "1", qtyX, y, h1, s(84f), Paint.Align.CENTER, 0.8f)
-                drawFittedText(c, "本", unitX, y, h1, s(84f), Paint.Align.CENTER, 0.8f)
+                if (durationColumn) {
+                    drawFittedText(c, b.durationText ?: "—", rightEdge, y, h1, durationWidth, Paint.Align.RIGHT)
+                } else {
+                    drawFittedText(c, "1", qtyX, y, h1, s(84f), Paint.Align.CENTER, 0.8f)
+                    drawFittedText(c, "本", unitX, y, h1, s(84f), Paint.Align.CENTER, 0.8f)
+                }
                 if (s0.showAuthor) {
                     y += s(42f)
                     drawFittedText(c, "作者:${b.author ?: "未知"}", titleX, y, mono, (rightEdge - titleX).coerceAtLeast(s(180f)), Paint.Align.LEFT, 0.78f)
@@ -3036,8 +3057,7 @@ object AutoWallpaperGenerator {
                     y += s(50f)
                     val st = when (b.status) { 2 -> "已读完"; 1 -> "阅读中"; else -> "未读" }
                     val value = b.progressText ?: formatProgress(b.progress, s0.progressMode)
-                    val duration = if (s0.showBookDuration && !b.durationText.isNullOrBlank()) "  时长:${b.durationText}" else ""
-                    drawFittedText(c, "进度:$value  状态:$st$duration", titleX, y, mono, (rightEdge - titleX).coerceAtLeast(s(180f)), Paint.Align.LEFT, 0.78f)
+                    drawFittedText(c, "进度:$value  状态:$st", titleX, y, mono, (rightEdge - titleX).coerceAtLeast(s(180f)), Paint.Align.LEFT, 0.78f)
                 }
             }
         }
