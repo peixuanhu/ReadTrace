@@ -2940,16 +2940,13 @@ object AutoWallpaperGenerator {
         val footerBlock = if (!hasFooter) 0f else if (hasFooterBarcode) {
             if (excerptMenu) 130f else 280f
         } else 130f
-        val questionHeadingSize = maxOf(50f, s0.receiptBodySize * 1.52f)
-        val questionBodySize = maxOf(39f, s0.receiptBodySize * 1.20f)
-        val questionDetailSize = maxOf(30f, s0.receiptBodySize * 0.94f)
-        val questionBlock = if (question == null) 0f else
-            70f + questionHeadingSize * 1.35f + questionBodySize * 1.45f * 2 +
-                questionDetailSize * 1.45f * (if (question.second.excerpt.isBlank()) 1 else 3)
-        val requiredH = questionBlock + headerBlock + bookLines + summaryBlock + chartBlock + footerBlock + 120f
+        // Keep the receipt's original fit budget independent of the question typography.
+        val questionStep = (s0.receiptBodySize * 1.3f).coerceAtLeast(36f)
+        val questionAllowance = if (question == null) 0f else
+            80f + questionStep * (if (question.second.excerpt.isBlank()) 2 else 3)
+        val requiredH = questionAllowance + headerBlock + bookLines + summaryBlock + chartBlock + footerBlock + 120f
         val fitScale = (h.toFloat() - 40f) / requiredH
-        val gs = if (noteTemplate) fitScale.coerceIn(0.52f, 1f)
-            else minOf(w / 1264f, fitScale)
+        val gs = fitScale.coerceIn(0.52f, 1f)
         fun s(v: Float): Float = v * gs
 
         val black = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
@@ -3086,7 +3083,13 @@ object AutoWallpaperGenerator {
             if (excerptMenu) s(118f) else s(260f)
         } else s(120f)
         val bottomSafe = (h - s(56f)).toFloat()
-        val availableChartH = ((bottomSafe - footerReserved - s(if (question == null) 24f else questionBlock + 64f)) - y).coerceAtLeast(s(70f))
+        val headingStep = h1.textSize * 1.35f
+        val bodyStep = text.textSize * 1.45f
+        val detailStep = mono.textSize * 1.45f
+        val chartClearance = if (question == null) s(24f) else
+            s(64f + 22f + 24f) + headingStep + 2 * bodyStep + detailStep +
+                (if (question.second.excerpt.isBlank()) 0f else s(8f) + 2 * detailStep)
+        val availableChartH = (bottomSafe - footerReserved - chartClearance - y).coerceAtLeast(s(70f))
         val maxChartBottom = y + availableChartH
 
         if (drawChart) {
@@ -3132,22 +3135,17 @@ object AutoWallpaperGenerator {
         if (question != null) {
             val (bookTitle, thought) = question
             val width = rightEdge - leftMargin
-            val headingPaint = Paint(h1).apply { textSize = s(questionHeadingSize) }
-            val bodyPaint = Paint(text).apply { textSize = s(questionBodySize) }
-            val detailPaint = Paint(mono).apply { textSize = s(questionDetailSize) }
             y += s(22f)
             c.drawLine(leftMargin, y, rightEdge, y, line)
-            y += s(questionHeadingSize * 1.35f)
-            c.drawText("我的问题", leftMargin, y, headingPaint)
-            val bodyStep = s(questionBodySize * 1.45f)
-            y = drawMultiLineText(c, thought.text, leftMargin, y + bodyStep, bodyPaint, width, bodyStep, 2)
-            val detailStep = s(questionDetailSize * 1.45f)
+            y += headingStep
+            c.drawText("我的问题", leftMargin, y, h1)
+            y = drawMultiLineText(c, thought.text, leftMargin, y + bodyStep, text, width, bodyStep, 2)
             if (thought.excerpt.isNotBlank()) {
                 y = drawMultiLineText(c, "划线：${thought.excerpt}", leftMargin, y + detailStep + s(8f),
-                    detailPaint, width, detailStep, 2)
+                    mono, width, detailStep, 2)
             }
             y += detailStep
-            drawFittedText(c, "《$bookTitle》", leftMargin, y, detailPaint, width)
+            drawFittedText(c, "《$bookTitle》", leftMargin, y, mono, width)
             y += s(24f)
         }
 
