@@ -2935,12 +2935,16 @@ object AutoWallpaperGenerator {
         val footerBlock = if (!hasFooter) 0f else if (hasFooterBarcode) {
             if (excerptMenu) 130f else 280f
         } else 130f
-        val questionStep = (s0.receiptBodySize * 1.3f).coerceAtLeast(36f)
+        val questionHeadingSize = maxOf(50f, s0.receiptBodySize * 1.52f)
+        val questionBodySize = maxOf(39f, s0.receiptBodySize * 1.20f)
+        val questionDetailSize = maxOf(30f, s0.receiptBodySize * 0.94f)
         val questionBlock = if (question == null) 0f else
-            40f + questionStep * (if (question.second.excerpt.isBlank()) 2 else 3) + 40f
+            70f + questionHeadingSize * 1.35f + questionBodySize * 1.45f * 2 +
+                questionDetailSize * 1.45f * (if (question.second.excerpt.isBlank()) 1 else 3)
         val requiredH = questionBlock + headerBlock + bookLines + summaryBlock + chartBlock + footerBlock + 120f
         val fitScale = (h.toFloat() - 40f) / requiredH
-        val gs = fitScale.coerceIn(0.52f, 1f)
+        val gs = if (noteTemplate) fitScale.coerceIn(0.52f, 1f)
+            else minOf(w / 1264f, fitScale)
         fun s(v: Float): Float = v * gs
 
         val black = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
@@ -3058,26 +3062,12 @@ object AutoWallpaperGenerator {
         }
 
         y += if (hasExcerptMenuBarcodeFooter) s(26f) else s(50f)
-        if (question != null) {
-            val (bookTitle, thought) = question
-            c.drawLine(leftMargin, y, rightEdge, y, line)
-            y += s(40f)
-            drawFittedText(c, "我的问题 · 《$bookTitle》", leftMargin, y, mono, rightEdge - leftMargin, Paint.Align.LEFT, 0.8f)
-            val step = s(questionStep)
-            y = drawMultiLineText(c, thought.text, leftMargin, y + step, text, rightEdge - leftMargin, step, 2)
-            if (thought.excerpt.isNotBlank()) {
-                y += step
-                drawFittedText(c, "划线：${thought.excerpt}", leftMargin, y, mono, rightEdge - leftMargin, Paint.Align.LEFT, 0.85f)
-            }
-            y += s(40f)
-        }
         val footerReserved = if (!hasFooter) 0f else if (hasFooterBarcode) {
             if (excerptMenu) s(118f) else s(260f)
         } else s(120f)
         val bottomSafe = (h - s(56f)).toFloat()
-        val availableChartH = ((bottomSafe - footerReserved - s(24f)) - y).coerceAtLeast(s(70f))
+        val availableChartH = ((bottomSafe - footerReserved - s(if (question == null) 24f else questionBlock + 64f)) - y).coerceAtLeast(s(70f))
         val maxChartBottom = y + availableChartH
-        var chartBottomUsed = y
 
         if (drawChart) {
             val chartLeft = s(80f)
@@ -3085,7 +3075,6 @@ object AutoWallpaperGenerator {
             val chartTop = y
             val desiredChartH = s(220f)
             val chartBottom = (chartTop + desiredChartH).coerceAtMost(maxChartBottom)
-            chartBottomUsed = chartBottom
 
             val autoMax = (stats.points.maxOrNull() ?: 1L).toFloat().coerceAtLeast(1f)
             val max = if (s0.yAxisMode == "FIXED") (s0.yAxisFixedMaxMinutes * 60000f).coerceAtLeast(1f) else autoMax
@@ -3120,8 +3109,35 @@ object AutoWallpaperGenerator {
             y = chartBottom + s(56f)
         }
 
+        if (question != null) {
+            val (bookTitle, thought) = question
+            val width = rightEdge - leftMargin
+            val headingPaint = Paint(h1).apply { textSize = s(questionHeadingSize) }
+            val bodyPaint = Paint(text).apply { textSize = s(questionBodySize) }
+            val detailPaint = Paint(mono).apply { textSize = s(questionDetailSize) }
+            y += s(22f)
+            c.drawLine(leftMargin, y, rightEdge, y, line)
+            y += s(questionHeadingSize * 1.35f)
+            c.drawText("我的问题", leftMargin, y, headingPaint)
+            val bodyStep = s(questionBodySize * 1.45f)
+            y = drawMultiLineText(c, thought.text, leftMargin, y + bodyStep, bodyPaint, width, bodyStep, 2)
+            val detailStep = s(questionDetailSize * 1.45f)
+            if (thought.excerpt.isNotBlank()) {
+                y = drawMultiLineText(c, "划线：${thought.excerpt}", leftMargin, y + detailStep + s(8f),
+                    detailPaint, width, detailStep, 2)
+            }
+            y += detailStep
+            drawFittedText(c, "《$bookTitle》", leftMargin, y, detailPaint, width)
+            y += s(24f)
+        }
+
         if (hasFooter) {
-            val baseY = if (drawChart) (chartBottomUsed + s(64f)) else if (hasExcerptMenuBarcodeFooter) y else (y + s(16f))
+            val baseY = when {
+                question != null -> y
+                drawChart -> y + s(8f)
+                hasExcerptMenuBarcodeFooter -> y
+                else -> y + s(16f)
+            }
             c.drawLine(s(40f), baseY, w - s(40f), baseY, line)
             if (s0.footerMode == "NOTE") {
                 if (hasFooterNote) drawFittedText(c, "备注: $footerNoteText", leftMargin, baseY + s(58f), text, (rightEdge - leftMargin), Paint.Align.LEFT, 0.78f)
