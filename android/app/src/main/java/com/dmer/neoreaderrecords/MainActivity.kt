@@ -482,6 +482,14 @@ class MainActivity : ComponentActivity() {
         navGroup.addView(dividerVertical())
         navGroup.addView(navPreview)
         navGroup.addView(dividerVertical())
+        val plates = makeActionItem("藏书票", false) {
+            startActivity(Intent(this, BookplateActivity::class.java))
+        }.apply {
+            background = null
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        navGroup.addView(plates)
+        navGroup.addView(dividerVertical())
         navGroup.addView(refreshAction)
         navGroup.addView(dividerVertical())
         navGroup.addView(generateAction)
@@ -1357,6 +1365,12 @@ class MainActivity : ComponentActivity() {
         val wallpaperModeSegment = bindSegmented("壁纸类型", wallpaperModeGroup, wallpaperOptions, isVertical = true)
         val wallpaperModeHint = addHint("说明：统计壁纸生成阅读账单；当前阅读封面会按所选数据来源取最近书籍封面，Neo 阅读器只读本地封面，微信读书会联网获取并缓存封面；自动封面优先会先尝试封面，失败时回退到账单；月历封面墙按所选来源读取数据，Neo 使用本地阅读事件，微信读书使用精确每日总时长和快照差分确认的日级书籍。提示：Neo 封面依赖 NeoReader 自身写入本地元数据，通常退出当前书籍后再锁屏更容易刷新；微信数据在解锁后生成，通常下一次锁屏显示最新结果。")
         val statsTemplateSegment = bindSegmented("统计壁纸模板", statsTemplateGroup, statsTemplateOptions, isVertical = true)
+        val questionCheck = makeCheck(prefs.getBoolean("receipt_show_question", false))
+        val questionRow = bindToggle("我的问题（微信读书想法中以问号结尾的内容）", questionCheck)
+        questionCheck.setOnCheckedChangeListener { _, enabled ->
+            prefs.edit().putBoolean("receipt_show_question", enabled).apply()
+            if (!isInitializingUi) applySettingsPreview()
+        }
         val statsTemplateHint = addHint("说明：阅读账单显示时长、进度和图表；摘录菜单显示主厨、价格和账单合计；读书菜单显示品类、厨师、每本书备注/摘录，不显示价格，继续支持图表和条码。")
         val bookNoteModeSegment = bindSegmented("书单备注来源", bookNoteModeGroup, bookNoteModeOptions, isVertical = true)
         val bookNoteModeHint = addHint("说明：手动备注按“每本书长期备注”保存。未启用阅读数据落库时按当前 NO.01~NO.05 位置保存，排序变化可能错位；启用后会尽量按书籍 key 保存，更稳定。热门划线来自微信公开热门内容，不代表你本人划线。")
@@ -1423,7 +1437,7 @@ class MainActivity : ComponentActivity() {
         val authorRow = bindToggle("显示作者行（在进度行上方）", showAuthorCheck)
         addHint("说明：如果文石元数据里没有作者，会显示未知；关闭后可节省空间。")
         val bookDurationRow = bindToggle("显示每本书籍阅读时长", showBookDurationCheck)
-        addHint("说明：打开后会在每本书的状态后追加“时长”；Neo 阅读器按本地阅读事件统计，微信读书按接口返回的阅读时长显示。")
+        addHint("开启后，阅读账单在每个书名右侧显示时长。微信读书采用所覆盖自然月的单书排行；按天或按周查看时，列名会标明月份。")
         val titleFontRow = bindSpinnerRow("标题字体（系统字体）", titleFontSpinner)
         val bodyFontRow = bindSpinnerRow("正文字体（系统字体）", bodyFontSpinner)
         pickFontDirBtn = Button(this).apply {
@@ -1666,6 +1680,7 @@ class MainActivity : ComponentActivity() {
             val coverOptsVisible = wallpaperModeGroup.checkedRadioButtonId == 1202 || wallpaperModeGroup.checkedRadioButtonId == 1203
             coverFitSegment.visibility = if (coverOptsVisible) View.VISIBLE else View.GONE
             val statsVisible = wallpaperModeGroup.checkedRadioButtonId == 1201
+            questionRow.visibility = if (statsVisible && statsTemplateGroup.checkedRadioButtonId == 1241) View.VISIBLE else View.GONE
             statsTemplateSegment.visibility = if (statsVisible) View.VISIBLE else View.GONE
             statsTemplateHint.visibility = if (statsVisible) View.VISIBLE else View.GONE
             val noteTemplateVisible = statsVisible && (statsTemplateGroup.checkedRadioButtonId == 1242 || statsTemplateGroup.checkedRadioButtonId == 1243)

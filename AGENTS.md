@@ -1,11 +1,14 @@
 # 项目协作规则
 
 - 始终使用简体中文回复。
+- 提交信息使用英文，包括标题和可选正文。标题遵循 Conventional Commits，格式为 `type: description` 或 `type(scope): description`，例如 `feat: add bookplate browsing`、`fix: prevent consecutive duplicate highlights`。
 - 每次验证完一个功能后，必须及时提交一次 Git commit，避免已验证状态和后续改动混在一起。
 - 每次完成一个新功能后，必须在最终回复中输出测试重点，方便用户按场景验证。
 - 每次开始修复一个问题前，必须先提交一次当前状态；随后围绕该问题持续修复，直到用户反馈该问题已经修成功。
 
 ## 分支与发布规则
+
+- 本 fork 的功能开发分支统一命名为 `dev/<功能名>`，例如 `dev/bookplates-and-questions`。
 
 - 正式发布线用于沉淀稳定功能，例如 `release/v1.0.5`。
 - 设备探测测试线用于汉王、掌阅、海信、老设备等兼容探测，例如 `test/device-probe`。

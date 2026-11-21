@@ -659,6 +659,39 @@ object WeReadClient {
     }
 
 
+    internal fun fetchHighlights(context: Context, apiKey: String, bookId: String): List<Bookplate.Line> {
+        val data = personalBookData(context, apiKey, "/book/bookmarklist", JSONObject().put("bookId", bookId))
+        return Bookplate.highlights(data)
+    }
+
+    private data class QuestionKey(val account: String, val bookId: String, val day: Int)
+    private val dailyQuestions = android.util.LruCache<QuestionKey, List<ReadingQuestion>>(48)
+
+    internal fun dailyQuestion(context: Context, key: String, bookId: String, day: Int): ReadingQuestion? {
+        val cacheKey = QuestionKey(key, bookId, day)
+        dailyQuestions.get(cacheKey)?.let { return ReadingQuestion.forDay(it, day) }
+        var cursor = 0L
+        val visited = mutableSetOf<Long>()
+        while (visited.add(cursor)) {
+            val params = JSONObject().put("bookid", bookId).put("count", 50).put("synckey", cursor)
+            val page = personalBookData(context, key, "/review/list/mine", params)
+            val questions = ReadingQuestion.fromPage(page)
+            if (questions.isNotEmpty() || page.optInt("hasMore") != 1) {
+                dailyQuestions.put(cacheKey, questions)
+                return ReadingQuestion.forDay(questions, day)
+            }
+            cursor = page.optLong("synckey")
+        }
+        return null
+    }
+
+    private fun personalBookData(context: Context, apiKey: String, api: String, params: JSONObject): JSONObject {
+        val body = params.put("api_name", api).put("skill_version", SKILL_VERSION)
+        val response = postJson(context, apiKey, body.toString())
+        check(response.code in 200..299) { "微信读书请求失败（HTTP ${response.code}）" }
+        return JSONObject(response.body)
+    }
+
     private data class HttpResult(val code: Int, val body: String)
 
     private fun postJson(context: Context, apiKey: String, body: String): HttpResult {
