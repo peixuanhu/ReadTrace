@@ -659,6 +659,18 @@ object WeReadClient {
     }
 
 
+    internal fun fetchHighlights(context: Context, apiKey: String, bookId: String): List<Bookplate.Line> {
+        val data = personalBookData(context, apiKey, "/book/bookmarklist", JSONObject().put("bookId", bookId))
+        return Bookplate.highlights(data)
+    }
+
+    private fun personalBookData(context: Context, apiKey: String, api: String, params: JSONObject): JSONObject {
+        val body = params.put("api_name", api).put("skill_version", SKILL_VERSION)
+        val response = postJson(context, apiKey, body.toString())
+        check(response.code in 200..299) { "微信读书请求失败（HTTP ${response.code}）" }
+        return JSONObject(response.body)
+    }
+
     private data class HttpResult(val code: Int, val body: String)
 
     private fun postJson(context: Context, apiKey: String, body: String): HttpResult {

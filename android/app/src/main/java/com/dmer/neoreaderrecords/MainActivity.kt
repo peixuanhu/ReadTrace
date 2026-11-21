@@ -482,6 +482,14 @@ class MainActivity : ComponentActivity() {
         navGroup.addView(dividerVertical())
         navGroup.addView(navPreview)
         navGroup.addView(dividerVertical())
+        val plates = makeActionItem("藏书票", false) {
+            startActivity(Intent(this, BookplateActivity::class.java))
+        }.apply {
+            background = null
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        navGroup.addView(plates)
+        navGroup.addView(dividerVertical())
         navGroup.addView(refreshAction)
         navGroup.addView(dividerVertical())
         navGroup.addView(generateAction)
