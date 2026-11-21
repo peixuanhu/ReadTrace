@@ -1,7 +1,7 @@
 # 项目协作规则
 
 - 始终使用简体中文回复。
-- 提交标题遵循 Conventional Commits，格式为 `type: 简短说明`，可选范围写作 `type(scope): 简短说明`。例如 `feat: 添加藏书票入口`、`fix: 修复划线重复显示`、`docs: 更新安装说明`。
+- 提交信息使用英文，包括标题和可选正文。标题遵循 Conventional Commits，格式为 `type: description` 或 `type(scope): description`，例如 `feat: add bookplate browsing`、`fix: prevent consecutive duplicate highlights`。
 - 每次验证完一个功能后，必须及时提交一次 Git commit，避免已验证状态和后续改动混在一起。
 - 每次完成一个新功能后，必须在最终回复中输出测试重点，方便用户按场景验证。
 - 每次开始修复一个问题前，必须先提交一次当前状态；随后围绕该问题持续修复，直到用户反馈该问题已经修成功。
