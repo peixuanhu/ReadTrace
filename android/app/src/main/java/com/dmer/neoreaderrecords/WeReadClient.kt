@@ -664,6 +664,27 @@ object WeReadClient {
         return Bookplate.highlights(data)
     }
 
+    private data class QuestionKey(val account: String, val bookId: String, val day: Int)
+    private val dailyQuestions = android.util.LruCache<QuestionKey, List<ReadingQuestion>>(48)
+
+    internal fun dailyQuestion(context: Context, key: String, bookId: String, day: Int): ReadingQuestion? {
+        val cacheKey = QuestionKey(key, bookId, day)
+        dailyQuestions.get(cacheKey)?.let { return ReadingQuestion.forDay(it, day) }
+        var cursor = 0L
+        val visited = mutableSetOf<Long>()
+        while (visited.add(cursor)) {
+            val params = JSONObject().put("bookid", bookId).put("count", 50).put("synckey", cursor)
+            val page = personalBookData(context, key, "/review/list/mine", params)
+            val questions = ReadingQuestion.fromPage(page)
+            if (questions.isNotEmpty() || page.optInt("hasMore") != 1) {
+                dailyQuestions.put(cacheKey, questions)
+                return ReadingQuestion.forDay(questions, day)
+            }
+            cursor = page.optLong("synckey")
+        }
+        return null
+    }
+
     private fun personalBookData(context: Context, apiKey: String, api: String, params: JSONObject): JSONObject {
         val body = params.put("api_name", api).put("skill_version", SKILL_VERSION)
         val response = postJson(context, apiKey, body.toString())

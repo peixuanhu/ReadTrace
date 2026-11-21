@@ -1662,6 +1662,27 @@ object AutoWallpaperGenerator {
         return ""
     }
 
+    private fun receiptQuestion(context: Context, books: List<BookItem>, s: AutoSettings): Pair<String, ReadingQuestion>? {
+        if (s.statsTemplate != "RECEIPT" || !context.getSharedPreferences("wallpaper_settings", Context.MODE_PRIVATE)
+                .getBoolean("receipt_show_question", false)) return null
+        val candidates = books.filter { !it.bookId.isNullOrBlank() }.sortedBy { it.bookId }
+        if (candidates.isEmpty()) return null
+        val key = WeReadClient.loadApiKey(context)
+        if (key.isBlank()) return null
+        val day = Calendar.getInstance().let { it.get(Calendar.YEAR) * 366 + it.get(Calendar.DAY_OF_YEAR) }
+        for (i in candidates.indices) {
+            val book = candidates[(day + i) % candidates.size]
+            val question = try {
+                WeReadClient.dailyQuestion(context, key, book.bookId!!, day)
+            } catch (e: Exception) {
+                AutoRefreshLog.i(context, "读取个人问题失败：${e.javaClass.simpleName}")
+                continue
+            }
+            if (question != null) return book.title to question
+        }
+        return null
+    }
+
     private fun resolveFooterNote(context: Context, apiKey: String, books: List<BookItem>, s: AutoSettings): String {
         if (s.footerNoteSource != "DATA_SOURCE") return s.noteText.trim()
         val effectiveApiKey = apiKey.ifBlank { WeReadClient.loadApiKey(context) }
@@ -2886,6 +2907,7 @@ object AutoWallpaperGenerator {
         val excerptMenu = s0.statsTemplate == "EXCERPT_MENU"
         val readingMenu = s0.statsTemplate == "READING_MENU"
         val noteTemplate = excerptMenu || readingMenu
+        val question = receiptQuestion(context, books, s0)
         val footerNoteText = resolveFooterNote(context, "", books, s0)
         val barcodeSeed = footerNoteText.ifBlank {
             "ReadTrace|${fmt(rangeStart)}|${fmt(rangeEnd)}|${stats.totalMs}|${books.joinToString("|") { it.title }}"
@@ -2913,7 +2935,10 @@ object AutoWallpaperGenerator {
         val footerBlock = if (!hasFooter) 0f else if (hasFooterBarcode) {
             if (excerptMenu) 130f else 280f
         } else 130f
-        val requiredH = headerBlock + bookLines + summaryBlock + chartBlock + footerBlock + 120f
+        val questionStep = (s0.receiptBodySize * 1.3f).coerceAtLeast(36f)
+        val questionBlock = if (question == null) 0f else
+            40f + questionStep * (if (question.second.excerpt.isBlank()) 2 else 3) + 40f
+        val requiredH = questionBlock + headerBlock + bookLines + summaryBlock + chartBlock + footerBlock + 120f
         val fitScale = (h.toFloat() - 40f) / requiredH
         val gs = fitScale.coerceIn(0.52f, 1f)
         fun s(v: Float): Float = v * gs
@@ -3033,6 +3058,19 @@ object AutoWallpaperGenerator {
         }
 
         y += if (hasExcerptMenuBarcodeFooter) s(26f) else s(50f)
+        if (question != null) {
+            val (bookTitle, thought) = question
+            c.drawLine(leftMargin, y, rightEdge, y, line)
+            y += s(40f)
+            drawFittedText(c, "我的问题 · 《$bookTitle》", leftMargin, y, mono, rightEdge - leftMargin, Paint.Align.LEFT, 0.8f)
+            val step = s(questionStep)
+            y = drawMultiLineText(c, thought.text, leftMargin, y + step, text, rightEdge - leftMargin, step, 2)
+            if (thought.excerpt.isNotBlank()) {
+                y += step
+                drawFittedText(c, "划线：${thought.excerpt}", leftMargin, y, mono, rightEdge - leftMargin, Paint.Align.LEFT, 0.85f)
+            }
+            y += s(40f)
+        }
         val footerReserved = if (!hasFooter) 0f else if (hasFooterBarcode) {
             if (excerptMenu) s(118f) else s(260f)
         } else s(120f)
